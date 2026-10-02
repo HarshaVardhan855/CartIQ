@@ -1,6 +1,6 @@
 # 🛒 CartIQ — Search Once. Compare Everywhere.
 
-> **Smart Shopping Made Simple.** An AI-powered e-commerce product discovery and price comparison platform that searches products across marketplaces, groups identical products, compares prices, ratings, and offers—all with transparent, explainable AI.
+> **Smart Shopping Made Simple.** An AI-powered e-commerce product discovery and price comparison platform that searches products across marketplaces, groups identical products, compares prices, ratings, and offers, and provides direct product links using AI-powered query understanding and explainable product matching.
 
 ---
 
@@ -115,24 +115,29 @@ cp .env.example .env
 # Edit .env with your API keys
 ```
 
-**Required Variables:**
+### Required Variables
+
 ```env
-# AI Providers (at least one required)
-GEMINI_API_KEY=your_gemini_key_here
-GROQ_API_KEY=your_groq_key_here
+# AI
+GEMINI_API_KEY=...
+GROQ_API_KEY=...
 
-# Optional: Email Notifications
-SENDGRID_API_KEY=your_sendgrid_key
-SENDGRID_SENDER_EMAIL=noreply@cartiq.app
+# Supabase
+SUPABASE_URL=...
+SUPABASE_KEY=...
 
-# Optional: Live Marketplace APIs
-AMAZON_API_KEY=your_amazon_api_key
-FLIPKART_API_KEY=your_flipkart_api_key
-MEESHO_API_KEY=your_meesho_api_key
+# PostgreSQL / Supabase database
+DATABASE_URL=...
 
-# Optional: Affiliate Tracking
-AMAZON_ASSOCIATE_TAG=your_tag
-FLIPKART_AFFILIATE_ID=your_id
+# SendGrid feedback email
+SENDGRID_API_KEY=...
+SENDGRID_FROM_EMAIL=...
+
+# Google Form feedback
+FEEDBACK_FORM_URL=...
+
+# CartIQ backend URL
+CARTIQ_API_URL=...
 ```
 
 ### Running the Application
