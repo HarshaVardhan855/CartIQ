@@ -726,10 +726,14 @@ class DemoSourceAdapter(BaseSourceAdapter):
     """
     Category-agnostic demo source adapter.
     Accepts any natural-language query and returns all matching controlled demo products.
+    Clearly identifies all offers as DEMO data.
     """
 
     def __init__(self, marketplace_name: str = "DemoAll"):
         super().__init__(marketplace_name)
+
+    def get_status(self) -> str:
+        return "DEMO"
 
     def fetch_offers(self, query: str, category: Optional[str] = None, max_budget: Optional[float] = None) -> List[ProductOffer]:
         logger.info(f"DemoSourceAdapter fetching for query='{query}', category='{category}', budget={max_budget}")
@@ -747,7 +751,7 @@ class DemoSourceAdapter(BaseSourceAdapter):
                 continue
             seen_source_ids.add(sid)
             marketplace = raw_item.get("marketplace", "DemoStore")
-            offer = normalize_offer(raw_item, marketplace)
+            offer = normalize_offer(raw_item, marketplace, source_type="DEMO")
             matched_offers.append(offer)
 
         return matched_offers

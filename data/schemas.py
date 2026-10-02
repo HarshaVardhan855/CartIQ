@@ -27,6 +27,7 @@ class ProductOffer(BaseModel):
     product_url: str = Field(description="Direct URL to original product page")
     image_url: Optional[str] = Field(default=None, description="Product image URL")
     source_product_id: str = Field(description="Marketplace specific product identifier")
+    source_type: str = Field(default="DEMO", description="Source data status: VERIFIED_LIVE or DEMO")
     last_updated: str = Field(default_factory=lambda: datetime.now().strftime("%d %b %Y, %I:%M %p"), description="Price retrieval timestamp")
 
 class GroupedProduct(BaseModel):
@@ -47,6 +48,7 @@ class GroupedProduct(BaseModel):
     price_difference: float = 0.0
     lowest_marketplace: str = ""
     available_offers_count: int = 0
+    source_type: str = Field(default="DEMO", description="Source data status: VERIFIED_LIVE or DEMO")
 
 class SearchQuery(BaseModel):
     """

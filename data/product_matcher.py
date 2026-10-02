@@ -183,6 +183,10 @@ class ProductMatcher:
                     if f and f not in merged_features:
                         merged_features.append(f)
 
+            # Check if cluster contains verified live offers or is demo only
+            is_verified = any(o.source_type == "VERIFIED_LIVE" for o in cluster)
+            group_source_type = "VERIFIED_LIVE" if is_verified else "DEMO"
+
             grouped = GroupedProduct(
                 product_id=group_id,
                 canonical_name=canonical_name,
@@ -196,7 +200,8 @@ class ProductMatcher:
                 highest_price=highest_price,
                 price_difference=price_diff,
                 lowest_marketplace=lowest_offer.marketplace,
-                available_offers_count=len(sorted_offers)
+                available_offers_count=len(sorted_offers),
+                source_type=group_source_type
             )
             grouped_products.append(grouped)
 

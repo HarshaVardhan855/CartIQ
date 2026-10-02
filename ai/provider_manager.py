@@ -64,7 +64,19 @@ class ProviderManager:
 
         # 3. Graceful Fallback if BOTH AI providers fail
         logger.warning("[ProviderManager] Both Gemini and Groq are unavailable. Returning deterministic fallback.")
-        fallback_msg = "AI assistance is temporarily unavailable. Product search and price comparison are still available."
+        
+        if system_prompt and "AI Shopping Advisor" in system_prompt:
+            fallback_msg = (
+                "I am currently operating in offline mode. While I cannot generate a specific AI response right now, "
+                "here is a general shopping checklist:\n\n"
+                "1. **Compare Features:** Check key specifications (e.g., RAM, storage, battery life) against your needs.\n"
+                "2. **Check Reviews:** Always read verified buyer reviews before making a purchase.\n"
+                "3. **Verify Sellers:** Buy from official or highly-rated sellers on the platform.\n"
+                "4. **Live Prices:** Please search directly on Amazon, Flipkart, or Meesho to check current prices and availability."
+            )
+        else:
+            fallback_msg = "AI assistance is temporarily unavailable. Product search and price comparison are still available."
+        
         return fallback_msg, "deterministic_fallback"
 
     def generate_json(
@@ -118,8 +130,8 @@ class ProviderManager:
         q = query.lower()
         budget = None
         
-        # Regex for rupees e.g. "under 1000", "under ₹1,000", "below 500"
-        budget_match = re.search(r'(?:under|below|less than|budget|rs\.?|₹)\s*([\d,]+)', q)
+        # Regex for rupees e.g. "under 1000", "under ₹1,000", "below 500", "within 500"
+        budget_match = re.search(r'(?:under|below|less than|within|budget|rs\.?|₹)\s*([\d,]+)', q)
         if budget_match:
             try:
                 budget = float(budget_match.group(1).replace(",", ""))

@@ -17,6 +17,7 @@ def search_products(payload: SearchQuery, simulate_gemini_failure: bool = False)
     POST /api/search
     1. Parses NL query into structured intent via ProviderManager (Gemini -> Groq -> Rule Fallback).
     2. Fetches offers, normalizes, performs 5-step matching, and filters budget in Python.
+    3. Provides verified live data if configured or legitimate marketplace search links.
     """
     try:
         # Extract structured parameters
@@ -36,6 +37,13 @@ def search_products(payload: SearchQuery, simulate_gemini_failure: bool = False)
             sort_by=payload.sort_by
         )
 
+        # Generate real marketplace search links and retrieve source statuses
+        search_links = product_service.get_marketplace_search_links(
+            query=payload.query,
+            category=extracted.category
+        )
+        source_statuses = product_service.get_source_statuses()
+
         return {
             "success": True,
             "query": payload.query,
@@ -43,6 +51,8 @@ def search_products(payload: SearchQuery, simulate_gemini_failure: bool = False)
             "provider_used": extracted.provider_used,
             "total_products": len(grouped_products),
             "products": [p.dict() for p in grouped_products],
+            "marketplace_search_links": search_links,
+            "source_status": source_statuses,
             "warnings": warnings
         }
     except Exception as e:

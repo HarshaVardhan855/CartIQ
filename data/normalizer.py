@@ -1,12 +1,14 @@
 """
 Data Normalization module for CartIQ.
 Converts heterogeneous marketplace raw dictionaries into validated ProductOffer schema.
+Ensures deterministic URL validation and clear distinction between verified and demo data.
 """
 
 import re
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 from data.schemas import ProductOffer
+from utils.validators import validate_product_url
 
 def clean_price(val: Any) -> float:
     """
@@ -25,7 +27,7 @@ def clean_price(val: Any) -> float:
     except ValueError:
         return 0.0
 
-def normalize_offer(raw_data: Dict[str, Any], marketplace: str) -> ProductOffer:
+def normalize_offer(raw_data: Dict[str, Any], marketplace: str, source_type: Optional[str] = None) -> ProductOffer:
     """
     Normalizes a raw dictionary from any marketplace source into a standardized ProductOffer.
     """
@@ -75,10 +77,9 @@ def normalize_offer(raw_data: Dict[str, Any], marketplace: str) -> ProductOffer:
     elif not isinstance(features, list):
         features = []
 
-    # 8. Product URL validation
-    product_url = raw_data.get("product_url") or raw_data.get("url") or ""
-    if not product_url or not isinstance(product_url, str):
-        product_url = "Product link unavailable"
+    # 8. Strict Product URL validation (No guessing, no fake URLs)
+    raw_url = raw_data.get("product_url") or raw_data.get("url") or ""
+    product_url = validate_product_url(str(raw_url), expected_marketplace=marketplace)
 
     # 9. Product ID & Source ID
     source_pid = str(raw_data.get("source_product_id") or raw_data.get("id") or name[:10])
@@ -87,6 +88,9 @@ def normalize_offer(raw_data: Dict[str, Any], marketplace: str) -> ProductOffer:
     image_url = raw_data.get("image_url")
     availability = bool(raw_data.get("availability", True))
     last_updated = raw_data.get("last_updated") or datetime.now().strftime("%d %b %Y, %I:%M %p")
+    
+    # 10. Source Type (VERIFIED_LIVE vs DEMO)
+    resolved_source_type = source_type or raw_data.get("source_type", "DEMO")
 
     return ProductOffer(
         product_id=product_id,
@@ -106,5 +110,6 @@ def normalize_offer(raw_data: Dict[str, Any], marketplace: str) -> ProductOffer:
         product_url=product_url,
         image_url=image_url,
         source_product_id=source_pid,
+        source_type=resolved_source_type,
         last_updated=last_updated
     )

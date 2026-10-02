@@ -1,18 +1,21 @@
 """
 RAG (Retrieval-Augmented Generation) Engine for CartIQ.
-Integrates LangChain, ChromaDB, and ProviderManager for grounded product Q&A.
+Integrates LangChain, ChromaDB, and ProviderManager for grounded product Q&A
+and general shopping advisory (no live marketplace data required).
 """
 
 from typing import List, Optional
 from data.schemas import GroupedProduct, AskResponse
 from ai.provider_manager import ProviderManager
-from ai.prompts import RAG_QA_SYSTEM_PROMPT
+from ai.prompts import RAG_QA_SYSTEM_PROMPT, GENERAL_SHOPPING_ADVISOR_SYSTEM_PROMPT
 from ai.embeddings import SimpleEmbeddingGenerator
 from utils.logger import logger
+
 
 class CartIQRAGEngine:
     """
     RAG Pipeline for product Q&A, requirement matching, and grounded shopping explanations.
+    When no products are available, falls back to general shopping advisory mode.
     """
 
     def __init__(self, provider_manager: Optional[ProviderManager] = None):
@@ -70,7 +73,7 @@ class CartIQRAGEngine:
             existing_ids = self.collection.get()["ids"]
             if existing_ids:
                 self.collection.delete(ids=existing_ids)
-            
+
             embeddings_list = [self.embedder.embed_text(d) for d in documents]
             self.collection.add(
                 documents=documents,
@@ -113,18 +116,34 @@ class CartIQRAGEngine:
     ) -> AskResponse:
         """
         Answers product Q&A using RAG + ProviderManager (Gemini -> Groq -> Rule Fallback).
+
+        When products are available: uses grounded RAG mode (no fabrication allowed).
+        When no products are available: uses general shopping advisory mode
+        (provides general buying guidance; never fabricates live marketplace data).
         """
         if not products:
-            return AskResponse(
-                answer="No products are currently retrieved in the search context to answer your question.",
-                context_used_count=0,
-                provider_used="none"
+            # === GENERAL SHOPPING ADVISOR MODE ===
+            # No live products — answer from general product knowledge only.
+            # CRITICAL: Must never fabricate current prices, ratings, or availability.
+            logger.info("[RAGEngine] No products in context — using General Shopping Advisor mode.")
+
+            system_prompt = GENERAL_SHOPPING_ADVISOR_SYSTEM_PROMPT
+            prompt = f"User Shopping Question: {question}"
+
+            answer_text, provider_used = self.provider_manager.generate_text(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                simulate_gemini_failure=simulate_gemini_failure
             )
 
-        # Index products if needed
-        self.index_products(products)
+            return AskResponse(
+                answer=answer_text,
+                context_used_count=0,
+                provider_used=provider_used
+            )
 
-        # Build context
+        # === RAG GROUNDED MODE (products available) ===
+        self.index_products(products)
         formatted_context = self.format_retrieved_context(products)
         system_prompt = RAG_QA_SYSTEM_PROMPT.format(context=formatted_context)
         prompt = f"User Shopping Question: {question}"

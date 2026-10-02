@@ -1,27 +1,52 @@
 """
 Product Data Service for CartIQ.
-Orchestrates multi-source data collection, normalization, 5-step product matching, and budget filtering.
-Handles single-source failures gracefully.
+Orchestrates multi-source data collection, normalization, 5-step product matching,
+deterministic budget filtering, and safe marketplace search link generation.
+Distinguishes between verified live data and demo catalog data.
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 from sources.source_a import AmazonSourceAdapter
 from sources.source_b import FlipkartSourceAdapter
 from sources.source_c import MeeshoSourceAdapter
 from sources.demo_source import DemoSourceAdapter
 from data.schemas import ProductOffer, GroupedProduct
 from data.product_matcher import ProductMatcher
+from utils.marketplace_links import build_marketplace_search_links
 from utils.logger import logger
+
 
 class ProductService:
     def __init__(self):
+        self.amazon_adapter = AmazonSourceAdapter()
+        self.flipkart_adapter = FlipkartSourceAdapter()
+        self.meesho_adapter = MeeshoSourceAdapter()
+        self.demo_adapter = DemoSourceAdapter()
+
         self.adapters = [
-            AmazonSourceAdapter(),
-            FlipkartSourceAdapter(),
-            MeeshoSourceAdapter(),
-            DemoSourceAdapter()
+            self.amazon_adapter,
+            self.flipkart_adapter,
+            self.meesho_adapter,
+            self.demo_adapter
         ]
         self.matcher = ProductMatcher()
+
+    def get_source_statuses(self) -> Dict[str, str]:
+        """
+        Reports operational status for each marketplace data provider:
+        VERIFIED_LIVE, DEMO, UNAVAILABLE, or NOT_CONFIGURED.
+        """
+        return {
+            "amazon": self.amazon_adapter.get_status(),
+            "flipkart": self.flipkart_adapter.get_status(),
+            "meesho": self.meesho_adapter.get_status()
+        }
+
+    def get_marketplace_search_links(self, query: str, category: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """
+        Builds safe real marketplace search destinations for Amazon, Flipkart, and Meesho.
+        """
+        return build_marketplace_search_links(query=query, category=category)
 
     def search_and_group(
         self,
@@ -41,8 +66,9 @@ class ProductService:
         # 1. Fetch from source adapters with resilience
         for adapter in self.adapters:
             # Skip if specific marketplace filter requested
-            if marketplace_filter and marketplace_filter != "All" and adapter.marketplace_name not in ["DemoAll", marketplace_filter]:
-                continue
+            if marketplace_filter and marketplace_filter != "All":
+                if adapter.marketplace_name not in ["DemoAll", marketplace_filter]:
+                    continue
 
             try:
                 offers = adapter.fetch_offers(query=query, category=category, max_budget=max_budget)
@@ -52,22 +78,13 @@ class ProductService:
                 logger.error(f"[ProductService] {adapter.marketplace_name} source failure: {e}")
                 source_warnings.append(msg)
 
-        if not all_raw_offers:
-            # Fallback to demo source if empty
-            try:
-                demo_adapter = DemoSourceAdapter()
-                all_raw_offers = demo_adapter.fetch_offers(query=query, category=category, max_budget=max_budget)
-            except Exception as e:
-                logger.error(f"Fallback demo adapter error: {e}")
-
         # 2. Group offers into same product clusters (Explainable 5-step matching)
         grouped_products = self.matcher.group_offers(all_raw_offers)
 
-        # 3. Enforce deterministic Budget Filtering in Python (Section 11, 38)
+        # 3. Enforce deterministic Budget Filtering in Python
         if max_budget is not None and max_budget > 0:
             filtered_groups = []
             for gp in grouped_products:
-                # Keep offers within budget
                 valid_offers = [o for o in gp.offers if o.price <= max_budget]
                 if valid_offers:
                     gp.offers = sorted(valid_offers, key=lambda o: o.price)
